@@ -29,9 +29,9 @@ def calculate_dotplot_sequential(Secuencia1, Secuencia2):
     return dotplot
 
 
-def calculate_dotplot_parallel(Secuencia1, Secuencia2):
+def calculate_dotplot_parallel(Secuencia1, Secuencia2, procesos):
     begin = time.time()
-    num_processes = 4
+    num_processes = procesos
     chunks = np.array_split(range(len(Secuencia1)), num_processes)
 
     with Pool(num_processes) as p:
@@ -40,14 +40,6 @@ def calculate_dotplot_parallel(Secuencia1, Secuencia2):
 
     dotplot = np.vstack(dotplot_list)
 
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
     # Aplicar el filtro al dotplot
     filtered_dotplot = filter_dotplot(dotplot)
 
@@ -139,7 +131,7 @@ def merge_sequences_from_fasta(file_path):
     return "".join(sequences)
 
 
-if __name__ == "__main__":
+def parse_arguments():
     # Configurar la línea de comandos
     parser = argparse.ArgumentParser(description='Dotplot analysis')
     parser.add_argument('--input1', required=True, help='Input fasta file 1')
@@ -151,9 +143,13 @@ if __name__ == "__main__":
                         help='Run dotplot using multiprocessing')
     parser.add_argument('--mpi', action='store_true',
                         help='Run dotplot using mpi4py')
+    parser.add_argument(
+        "-n", "--processes", type=int, help="Número de núcleos a utilizar en 'multiprocessing' (solo para método 'paralelo')", default=4)
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def run_dotplot_analysis(args):
     # Leer las secuencias desde los archivos fasta
     seq1 = str(SeqIO.read(args.input1, "fasta").seq)
     seq2 = str(SeqIO.read(args.input2, "fasta").seq)
@@ -162,7 +158,7 @@ if __name__ == "__main__":
     if args.sequential:
         dotplot = calculate_dotplot_sequential(seq1, seq2)
     elif args.multiprocessing:
-        dotplot = calculate_dotplot_parallel(seq1, seq2)
+        dotplot = calculate_dotplot_parallel(seq1, seq2, args.processes)
     elif args.mpi:
         dotplot = calculate_dotplot_mpi(seq1, seq2)
     else:
@@ -176,3 +172,8 @@ if __name__ == "__main__":
     elif args.mpi and MPI.COMM_WORLD.Get_rank() == 0:
         print("Error: no se pudo guardar la imagen en el proceso principal con MPI.")
         exit()
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    run_dotplot_analysis(args)
