@@ -8,6 +8,8 @@ import time
 from tqdm import tqdm
 from multiprocessing import Pool
 from scipy.signal import convolve2d
+import os
+import gc
 
 # Función para calcular el dotplot secuencialmente
 
@@ -29,22 +31,6 @@ def calculate_dotplot_sequential(Secuencia1, Secuencia2):
     return dotplot
 
 
-def calculate_dotplot_parallel(Secuencia1, Secuencia2):
-    begin = time.time()
-    num_processes = 4
-    chunks = np.array_split(range(len(Secuencia1)), num_processes)
-
-    with Pool(num_processes) as p:
-        filtered_dotplot_list = list(p.imap(
-            dotplot_chunk_and_filter, [(chunk, Secuencia1, Secuencia2) for chunk in chunks]))
-
-    filtered_dotplot = np.vstack(filtered_dotplot_list)
-
-    print("La matriz de resultado tiene tamaño: ", filtered_dotplot.shape)
-    print(f"\n El código se ejecutó en: {time.time() - begin} segundos")
-    return filtered_dotplot
-
-
 def dotplot_chunk_and_filter(args):
     chunk, Secuencia1, Secuencia2 = args
     dotplot = np.empty([len(chunk), len(Secuencia2)], dtype=np.int8)
@@ -57,6 +43,31 @@ def dotplot_chunk_and_filter(args):
 
     filtered_dotplot = filter_dotplot(dotplot)
     return filtered_dotplot
+
+
+def dotplot_generator(num_processes, chunks, Secuencia1, Secuencia2):
+    with mp.Pool(num_processes) as p:
+        for filtered_dotplot in p.imap(dotplot_chunk_and_filter, [(chunk, Secuencia1, Secuencia2) for chunk in chunks]):
+            yield filtered_dotplot
+
+
+def calculate_dotplot_parallel(Secuencia1, Secuencia2, output_file):
+    begin = time.time()
+    num_processes = 4
+    chunks = np.array_split(range(len(Secuencia1)), num_processes)
+
+    # Create a temporary file to store the partial dotplot
+    fp = np.memmap(output_file, dtype='int8', mode='w+',
+                   shape=(len(Secuencia1), len(Secuencia2)))
+
+    row_start = 0
+    for chunk_dotplot in dotplot_generator(num_processes, chunks, Secuencia1, Secuencia2):
+        row_end = row_start + chunk_dotplot.shape[0]
+        fp[row_start:row_end, :] = chunk_dotplot
+        row_start = row_end
+
+    print(f"\n El código se ejecutó en: {time.time() - begin} segundos")
+    return fp
 
 
 # Función para calcular el dotplot utilizando mpi4py
@@ -155,11 +166,13 @@ if __name__ == "__main__":
     seq1 = str(SeqIO.read(args.input1, "fasta").seq)
     seq2 = str(SeqIO.read(args.input2, "fasta").seq)
 
-    # Calcular el dotplot según la opción seleccionada
+# Calcular el dotplot según la opción seleccionada
+    output_file = os.path.splitext(args.output)[0] + "_temp.npy"
     if args.sequential:
         dotplot = calculate_dotplot_sequential(seq1, seq2)
     elif args.multiprocessing:
-        dotplot = calculate_dotplot_parallel(seq1, seq2)
+        # Add the missing output_file argument
+        dotplot = calculate_dotplot_parallel(seq1, seq2, output_file)
     elif args.mpi:
         dotplot = calculate_dotplot_mpi(seq1, seq2)
     else:
@@ -170,3 +183,11 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 10))
     plt.imshow(dotplot[:500, :500], cmap='Greys', aspect='auto')
     plt.savefig(args.output)
+
+    # Close and release memory for dotplot
+    del dotplot
+    gc.collect()
+
+    # Remove the temporary file
+    if os.path.exists(output_file):
+        os.remove(output_file)
