@@ -63,10 +63,11 @@ def dotplot_chunk(chunk, Secuencia1, Secuencia2):
 
 def filter_dotplot(dotplot):
     window_size = 5
-    window = np.eye(window_size)
-    filtered_dotplot = convolve2d(dotplot, window, mode='same')
-    threshold = 0.8 * window_size
-    binary_dotplot = (filtered_dotplot >= threshold).astype(int)
+    window = np.eye(window_size, dtype=np.float16)
+    filtered_dotplot = convolve2d(
+        dotplot, window, mode='same', dtype=np.float16)
+    threshold = np.float16(0.8 * window_size)
+    binary_dotplot = (filtered_dotplot >= threshold).astype(np.int8)
     return binary_dotplot
 
 # Función para calcular el dotplot utilizando mpi4py
