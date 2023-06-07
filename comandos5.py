@@ -40,6 +40,14 @@ def calculate_dotplot_parallel(Secuencia1, Secuencia2):
 
     dotplot = np.vstack(dotplot_list)
 
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
+    print("Empecé a filtrar")
     # Aplicar el filtro al dotplot
     filtered_dotplot = filter_dotplot(dotplot)
 
