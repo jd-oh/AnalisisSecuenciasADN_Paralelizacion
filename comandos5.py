@@ -25,34 +25,31 @@ def calculate_dotplot_sequential(Secuencia1, Secuencia2):
             else:
                 dotplot[i, j] = 0
 
-    print(f"\n El código se ejecutó en: {time.time() - begin} segundos")
-    return dotplot
+    filtered_dotplot = filter_dotplot(dotplot)
+
+    print(f"\n El código en secuencial se ejecutó en: {time.time() - begin} segundos")
+    return filtered_dotplot
 
 
-def calculate_dotplot_parallel(Secuencia1, Secuencia2):
+def calculate_dotplot_parallel(Secuencia1, Secuencia2, threads=4):
+    chunks = np.array_split(range(len(Secuencia1)), threads)
     begin = time.time()
-    num_processes = 4
-    chunks = np.array_split(range(len(Secuencia1)), num_processes)
 
-    with Pool(num_processes) as p:
+    with Pool(processes = threads) as p:
         dotplot_list = p.starmap(
             dotplot_chunk, [(chunk, Secuencia1, Secuencia2) for chunk in chunks])
 
     dotplot = np.vstack(dotplot_list)
+    end = time.time()
 
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
-    print("Empecé a filtrar")
+
+
     # Aplicar el filtro al dotplot
     filtered_dotplot = filter_dotplot(dotplot)
 
+
     print("La matriz de resultado tiene tamaño: ", filtered_dotplot.shape)
-    print(f"\n El código se ejecutó en: {time.time() - begin} segundos")
+    print(f"\n El código en multiprocessing(porción paralela) se ejecutó en: {end - begin} segundos")
     return filtered_dotplot
 
 
@@ -72,7 +69,13 @@ def dotplot_chunk(chunk, Secuencia1, Secuencia2):
 def filter_dotplot(dotplot):
     window_size = 5
     window = np.eye(window_size, dtype=np.float32)
+    print("Empecé a haceer el convolve 2d")
+    print("Empecé a haceer el convolve 2d")
+    print("Empecé a haceer el convolve 2d")
     filtered_dotplot = convolve2d(dotplot, window, mode='same')
+    print("Terminé de hacer el convolve 2d")
+    print("Terminé de hacer el convolve 2d")
+    print("Terminé de hacer el convolve 2d")
     filtered_dotplot = filtered_dotplot.astype(np.float16)
     threshold = np.float16(0.8 * window_size)
     binary_dotplot = (filtered_dotplot >= threshold).astype(np.int8)
@@ -81,8 +84,7 @@ def filter_dotplot(dotplot):
 
 
 def calculate_dotplot_mpi(Secuencia1, Secuencia2):
-    begin = time.time()
-
+    #beginTotal = time.time()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -91,6 +93,8 @@ def calculate_dotplot_mpi(Secuencia1, Secuencia2):
     chunks = np.array_split(range(len(Secuencia1)), size)
 
     dotplot = np.empty([len(chunks[rank]), len(Secuencia2)], dtype=np.int8)
+
+    begin = time.time()
 
     for i in range(len(chunks[rank])):
         for j in range(len(Secuencia2)):
@@ -106,12 +110,16 @@ def calculate_dotplot_mpi(Secuencia1, Secuencia2):
     if rank == 0:
         # merge the gathered data into a single array
         merged_data = np.vstack(dotplot)
-
+        end = time.time()
         # Apply the filter_dotplot function to the merged_data
         filtered_merged_data = filter_dotplot(merged_data)
 
-        end = time.time()
-        print(f"Tiempo total de ejecución: {end-begin} segundos")
+        #endTotal = time.time()
+
+        #print(f"Tiempo de ejecución total en MPI: {endTotal-beginTotal} segundos")
+
+        
+        print(f"Tiempo de ejecución en MPI(porción paralela): {end-begin} segundos")
 
         return filtered_merged_data
 
@@ -137,6 +145,139 @@ def merge_sequences_from_fasta(file_path):
         sequences.append(str(record.seq))
     return "".join(sequences)
 
+"""
+def calculo_tiempos_multiprocessing(Secuencia1, Secuencia2):
+    n_proc = [1,2, 3, 4]
+    times = []
+    for i in n_proc:
+        begin_paralelo = time.time()
+        calculate_dotplot_parallel(Secuencia1, Secuencia2,i)
+        end_paralelo = time.time()
+        times.append(end_paralelo-begin_paralelo)   
+        print("Dotplot con ",i," procesadores, tiempo: ",end_paralelo-begin_paralelo," segundos")
+
+    acel = [times[0]/i for i in times]
+    efic = [acel[i]/n_proc[i] for i in range(len(n_proc))]
+    print("Aceleración: ",acel)
+    print("Eficiencia: ",efic)
+
+    
+    plt.figure(figsize=(5,5))
+    plt.plot(n_proc,times)  
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Tiempo de ejecución")
+
+    
+    plt.figure(figsize=(10,5))
+    plt.subplot(1,2,1)
+    plt.plot(n_proc,times)
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Tiempo de ejecución")
+    plt.subplot(1,2,2)
+    plt.plot(n_proc,acel)
+    plt.plot(n_proc,efic)
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Aceleración y eficiencia")
+    plt.legend(["Aceleración","Eficiencia"])
+
+    #plt.show()
+    plt.savefig("tiempos2.png")
+"""
+
+def calculo_tiempos_mpi4py():
+    n_proc = [1,2,3,4]
+    times = [352.8144178390503, 225.89974403381348, 187.84728908538818, 171.14893579483032]
+    """
+    for i in n_proc:
+        begin_paralelo_mpi = time.time()
+        calculate_dotplot_mpi(Secuencia1, Secuencia2,i)
+        end_paralelo_mpi = time.time()
+        times.append(end_paralelo_mpi-begin_paralelo_mpi)   
+        print("Dotplot con ",i," procesadores, tiempo: ",end_paralelo_mpi-begin_paralelo_mpi," segundos")
+    """
+    
+
+    acel = [times[0]/i for i in times]
+    efic = [acel[i]/n_proc[i] for i in range(len(n_proc))]
+    print("Aceleración: ",acel)
+    print("Eficiencia: ",efic)
+
+    plt.figure(figsize=(5,5))
+    plt.plot(n_proc,times)  
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Tiempo de ejecución")
+
+    plt.figure(figsize=(10,5))
+    plt.subplot(1,2,1)
+    plt.plot(n_proc,times)
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Tiempo de ejecución")
+    plt.subplot(1,2,2)
+    plt.plot(n_proc,acel)
+    plt.plot(n_proc,efic)
+    plt.xlabel("Número de procesadores")
+    plt.ylabel("Aceleración y eficiencia")
+    plt.legend(["Aceleración","Eficiencia"])
+
+    #plt.show()
+    plt.savefig("tiemposMPI.png")
+    
+"""
+
+def calculo_escalamiento_multiprocessing(Secuencia2):
+    n_proc = [1, 2, 3, 4]
+    strong_times = []  
+    weak_times = []
+
+    for i in n_proc:
+        begin_paralelo = time.time()
+        calculate_dotplot_parallel(Secuencia2, Secuencia2,i)
+        end_paralelo = time.time()
+        strong_times.append(end_paralelo - begin_paralelo)   
+        print("Dotplot con ", i, " procesadores, tiempo: ", end_paralelo - begin_paralelo)
+
+    for i in n_proc:
+        Secuencia = Secuencia2[:len(Secuencia2)*i]  # Incrementa el tamaño de la secuencia.
+        begin_paralelo = time.time()
+        calculate_dotplot_parallel(Secuencia, Secuencia, i)
+        end_paralelo = time.time()
+        weak_times.append(end_paralelo - begin_paralelo)   
+        print("Dotplot con ", i, " procesadores, tiempo: ", end_paralelo - begin_paralelo)
+
+    plt.figure(figsize=(10, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(n_proc, strong_times, marker='o')
+    plt.title("Strong Scaling")
+    plt.xlabel("Number of processors")
+    plt.ylabel("Time (s)")
+
+    plt.subplot(1, 2, 2)
+    plt.plot(n_proc, weak_times, marker='o')
+    plt.title("Weak Scaling")
+    plt.xlabel("Number of processors")
+    plt.ylabel("Time (s)")
+
+    plt.tight_layout()
+    plt.savefig("EscalamientoMultiprocessing.png")
+
+"""
+
+def calculate_strong_scalability(Secuencia1, Secuencia2):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    strong_times = []
+
+    for i in range(rank + 1):
+        begin_parallel = time.time()
+        calculate_dotplot_mpi(Secuencia1, Secuencia2)
+        end_parallel = time.time()
+        strong_times.append(end_parallel - begin_parallel)
+        print("Dotplot con ", i+1, " procesadores, tiempo: ", end_parallel - begin_parallel)
+
+    return strong_times
+
 
 if __name__ == "__main__":
     # Configurar la línea de comandos
@@ -154,21 +295,38 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Leer las secuencias desde los archivos fasta
+    beginDatos = time.time()
     seq1 = str(SeqIO.read(args.input1, "fasta").seq)
     seq2 = str(SeqIO.read(args.input2, "fasta").seq)
+    endDatos = time.time()
+
+    print("El tiempo de carga de datos es", endDatos - beginDatos, "segundos")
+
 
     # Calcular el dotplot según la opción seleccionada
     if args.sequential:
         dotplot = calculate_dotplot_sequential(seq1, seq2)
     elif args.multiprocessing:
         dotplot = calculate_dotplot_parallel(seq1, seq2)
+        #calculo_tiempos_multiprocessing(seq1, seq2)
+        #calculo_escalamiento_multiprocessing(seq2)
     elif args.mpi:
         dotplot = calculate_dotplot_mpi(seq1, seq2)
+        #calculo_tiempos_mpi4py()
     else:
         print("Debes seleccionar al menos una opción para calcular el dotplot.")
         exit()
 
-    # Guardar el dotplot en un archivo de imagen
+    
+     # Guardar el dotplot en un archivo de imagen
+    beginImagen = time.time()
     plt.figure(figsize=(10, 10))
     plt.imshow(dotplot[:500, :500], cmap='Greys', aspect='auto')
     plt.savefig(args.output)
+    endImagen = time.time()
+    
+    print("El tiempo de carga de imagenes es", endImagen - beginImagen, "segundos")
+    
+   
+
+
